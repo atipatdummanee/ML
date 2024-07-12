@@ -1,52 +1,77 @@
+from scipy.spatial import distance as dist
+from imutils import perspective
+from imutils import contours
+import numpy as np
+import imutils
 import cv2
-import os
-from matplotlib import pyplot as plt
 
-# Path to the directory containing images
-directory_path = "C:\\Users\\Admin\\Desktop\\images"
+def midpoint(ptA, ptB):
+	return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
 
-# List all files in the directory
-image_files = [f for f in os.listdir(directory_path) if os.path.isfile(os.path.join(directory_path, f))]
+image = cv2.imread(r"C:\Users\Admin\Desktop\images\captured_image_2024-05-18 07-46-52.jpg")
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+gray = cv2.GaussianBlur(gray, (7, 7), 0)
 
-# Process each image file
-for image_file in image_files:
-    # Full path to the image
-    image_path = os.path.join(directory_path, image_file)
+edged = cv2.Canny(gray, 50, 100)
+edged = cv2.dilate(edged, None, iterations=1)
+edged = cv2.erode(edged, None, iterations=1)
 
-    # Load the image
-    image = cv2.imread(image_path)
+cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL,
+	cv2.CHAIN_APPROX_SIMPLE)
+cnts = imutils.grab_contours(cnts)
 
-    # Check if the image was loaded correctly
-    if image is None:
-        print(f"Error: Unable to load image at {image_path}")
-        continue
+(cnts, _) = contours.sort_contours(cnts)
+pixelsPerMetric = None
 
-    # Convert the image to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+for c in cnts:
+	if cv2.contourArea(c) < 100:
+		continue
 
-    # Apply edge detection
-    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+	orig = image.copy()
+	box = cv2.minAreaRect(c)
+	box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box)
+	box = np.array(box, dtype="int")
 
-    # Find contours in the edged image
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+	box = perspective.order_points(box)
+	cv2.drawContours(orig, [box.astype("int")], -1, (0, 255, 64), 2)
 
-    # Assuming the largest contour in terms of height is the plant
-    max_height = 0
-    plant_contour = None
-    for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        if h > max_height:
-            max_height = h
-            plant_contour = contour
+	for (x, y) in box:
+		cv2.circle(orig, (int(x), int(y)), 5, (0, 255, 64), -1)
 
-    # Draw the contour of the plant on the original image
-    cv2.drawContours(image, [plant_contour], -1, (0, 255, 0), 3)
+	(tl, tr, br, bl) = box
+	(tltrX, tltrY) = midpoint(tl, tr)
+	(blbrX, blbrY) = midpoint(bl, br)
 
-    # Display the image with the plant contour
-    plt.figure(figsize=(10, 8))
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    plt.title(f'Plant Contour - {image_file}')
-    plt.axis('off')
+	(tlblX, tlblY) = midpoint(tl, bl)
+	(trbrX, trbrY) = midpoint(tr, br)
 
-    # Print the height of the plant in pixels
-    print(f"Height of the plant in {image_file} in pixels: {max_height}")
+	cv2.circle(orig, (int(tltrX), int(tltrY)), 0, (0, 255, 64), 0)
+	cv2.circle(orig, (int(blbrX), int(blbrY)), 0, (0, 255, 64), 0)
+	cv2.circle(orig, (int(tlblX), int(tlblY)), 0, (0, 255, 64), 0)
+	cv2.circle(orig, (int(trbrX), int(trbrY)), 0, (0, 255, 64), 0)
+
+	cv2.line(orig, (int(tltrX), int(tltrY)), (int(blbrX), int(blbrY)),
+		(255, 255, 255), 1)
+	cv2.line(orig, (int(tlblX), int(tlblY)), (int(trbrX), int(trbrY)),
+		(255, 255, 255), 1)
+
+	dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
+	dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+
+	if pixelsPerMetric is None:
+		pixelsPerMetric = dB / 1.02362205
+
+	dimA = dA / pixelsPerMetric
+	dimB = dB / pixelsPerMetric
+
+	cv2.putText(orig, "{:.2f}cm".format(dimA * 2.54),
+		(int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX,
+		0.65, (255, 255, 255), 2)
+	cv2.putText(orig, "{:.2f}cm".format(dimB * 2.54),
+		(int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
+		0.65, (255, 255, 255), 2)
+
+	# show output
+	cv2.imshow("Measuring_Size_Image", orig)
+	cv2.waitKey(0)
+

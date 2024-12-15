@@ -46,7 +46,7 @@ total_counts = layperson_counts + monk_counts
 fig, ax = plt.subplots(figsize=(8, 8))  # ขนาดของกราฟ
 
 # ใช้ autopct ในการแสดงเป็นจำนวนเต็ม
-ax.pie(total_counts, labels=labels, autopct=lambda p: f'{int(p * sum(total_counts) / 100)}', startangle=90, colors=['blue', 'pink'], textprops={'fontsize': 12, 'fontfamily': 'TH Sarabun'})
+ax.pie(total_counts, labels=labels, autopct=lambda p: f'{int(p * sum(total_counts) / 100)}', startangle=90, colors=['blue', 'pink'], textprops={'fontsize': 12, 'fontfamily': 'tahoma'})
 
 # ชื่อกราฟ
 ax.set_title('การเปรียบเทียบจำนวนฆารวาสและพระในแต่ละเดือน')
